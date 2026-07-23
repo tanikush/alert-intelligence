@@ -1,0 +1,25 @@
+# Known alert patterns -> remediation actions.
+# safe_to_automate: true means the Remediation Engine may auto-run this
+# action once confidence clears MIN_CONFIDENCE_FOR_AUTOMATION.
+# Keep destructive/risky actions marked false - they'll still be suggested,
+# just never auto-applied.
+
+HighErrorRate:
+  action: restart_pod
+  description: "Restart the affected pod(s); usually clears transient error spikes."
+  safe_to_automate: true
+
+HighMemoryUsage:
+  action: scale_up
+  description: "Scale replica count up by 1 to relieve memory pressure."
+  safe_to_automate: true
+
+DiskSpaceLow:
+  action: cleanup_temp_files
+  description: "Run temp-file cleanup job on the affected node."
+  safe_to_automate: false
+
+DatabaseConnectionPoolExhausted:
+  action: rollback_deploy
+  description: "Roll back to previous version; usually caused by a bad connection-pool config change."
+  safe_to_automate: false

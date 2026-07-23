@@ -1,0 +1,13 @@
+global:
+  resolve_timeout: 5m
+route:
+  receiver: 'alert-intelligence'
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+receivers:
+  - name: 'alert-intelligence'
+    webhook_configs:
+      - url: 'http://alert-intelligence.monitoring.svc.cluster.local:8000/webhook/prometheus'
+        send_resolved: true

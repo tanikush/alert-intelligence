@@ -1,0 +1,5 @@
+venv/
+__pycache__/
+*.pyc
+alert_intelligence.db
+.env
