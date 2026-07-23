@@ -38,33 +38,33 @@ Alert Sources (Prometheus Alertmanager / Datadog / generic webhook)
         │
         ▼
 ┌───────────────────┐
-│  Ingestion         │  normalizes every source into one common Alert schema
+│  Ingestion        │  normalizes every source into one common Alert schema
 └───────────────────┘
         │
         ▼
 ┌───────────────────┐
-│  Correlator        │  groups related alerts into a single Incident
+│  Correlator       │  groups related alerts into a single Incident
 └───────────────────┘  (same service + topology-aware, time-windowed)
         │
         ▼
 ┌───────────────────┐
-│  Enricher          │  attaches recent deploys, past incident history,
+│  Enricher         │  attaches recent deploys, past incident history,
 └───────────────────┘  and the matching runbook
         │
         ▼
 ┌───────────────────┐
-│  Scorer            │  produces a 0-100 confidence score
+│  Scorer           │  produces a 0-100 confidence score
 └───────────────────┘  (rule-based + learns from feedback — no black box)
         │
         ▼
 ┌───────────────────┐
-│  Remediation       │  suggests a fix, or auto-runs it if confidence and
-│  Engine            │  the action are both marked safe
+│  Remediation      │  suggests a fix, or auto-runs it if confidence and
+│  Engine           │  the action are both marked safe
 └───────────────────┘
         │
         ▼
 ┌───────────────────┐
-│  Notifier          │  sends ONE enriched incident, not N raw alerts
+│  Notifier         │  sends ONE enriched incident, not N raw alerts
 └───────────────────┘
         │
         ▼
