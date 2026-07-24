@@ -31,3 +31,15 @@ MIN_CONFIDENCE_FOR_SUGGESTION = 40
 # Minimum confidence AND the action must be marked safe_to_automate
 # before we auto-run remediation instead of merely suggesting it.
 MIN_CONFIDENCE_FOR_AUTOMATION = 85
+
+# --- Kubernetes remediation settings ---
+# CRITICAL SAFETY DEFAULT: dry_run=True means actions are logged but never
+# actually applied to the cluster. Only flip this after you've reviewed
+# k8s_mapping.yaml and tested in a non-prod cluster.
+KUBE_DRY_RUN = True
+
+# Path to kubeconfig. If None, the kubernetes client falls back to
+# in-cluster config (when running as a pod) or ~/.kube/config.
+KUBECONFIG_PATH = None
+
+SERVICE_K8S_MAP_PATH = BASE_DIR / "data" / "service_k8s_map.yaml"

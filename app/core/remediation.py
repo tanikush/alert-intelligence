@@ -11,6 +11,7 @@ Otherwise, it's surfaced as a *suggestion* only - never silently applied.
 import yaml
 from app.models.schemas import Incident
 from app import config
+from app.core import k8s_executor
 
 _runbooks_cache = None
 
@@ -53,9 +54,16 @@ def maybe_remediate(incident: Incident) -> Incident:
 
 
 def _execute(action: str, service: str) -> None:
-    """Stub executor. Replace with real integrations:
-    - "restart_pod"      -> kubernetes client: delete pod / rollout restart
-    - "scale_up"         -> kubernetes client: patch HPA / deployment replicas
-    - "rollback_deploy"  -> call your CD tool's rollback API
-    """
-    print(f"[AUTO-REMEDIATION] Running '{action}' on service '{service}'")
+    """Runs the real Kubernetes action via k8s_executor. Any failure here
+    is caught and logged rather than raised - a remediation attempt going
+    wrong must never crash the alert pipeline itself; the incident still
+    gets reported to on-call either way."""
+    handler = k8s_executor.ACTIONS.get(action)
+    if not handler:
+        print(f"[REMEDIATION] No executor registered for action '{action}' - skipping")
+        return
+
+    try:
+        handler(service)
+    except Exception as e:
+        print(f"[REMEDIATION FAILED] action='{action}' service='{service}' error={e}")

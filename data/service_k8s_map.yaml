@@ -1,0 +1,8 @@
+# Maps your internal service name (as it appears in alerts) to the
+# Kubernetes objects that actually need to be acted on.
+# Edit this to match your real cluster before enabling KUBE_DRY_RUN = False.
+
+alert-intelligence:
+  namespace: monitoring
+  deployment_name: alert-intelligence
+  label_selector: "app=alert-intelligence"
