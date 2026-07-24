@@ -3,11 +3,12 @@
 **A DevOps alert-fatigue solver.** Ingests raw alerts from Prometheus, Datadog, or
 any generic webhook, correlates them into single incidents, enriches them with
 real context (recent deploys, past resolutions, matching runbooks), scores
-them by confidence, and suggests — or safely auto-applies — remediation for
+them by confidence, sends a single enriched notification to Slack, and
+safely auto-applies remediation — including real Kubernetes actions — for
 well-understood patterns.
 
 Built and tested end-to-end on a real Kubernetes cluster (kind) with a live
-Prometheus + Alertmanager + Grafana stack.
+Prometheus + Alertmanager + Grafana stack, and a real Slack workspace.
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)
@@ -58,14 +59,14 @@ Alert Sources (Prometheus Alertmanager / Datadog / generic webhook)
         │
         ▼
 ┌───────────────────┐
-│  Remediation      │  suggests a fix, or auto-runs it if confidence and
-│  Engine           │  the action are both marked safe
-└───────────────────┘
+│  Remediation      │  suggests a fix, or auto-runs it — including real
+│  Engine           │  Kubernetes pod restarts / scaling / rollbacks —
+└───────────────────┘  if confidence and the action are both marked safe
         │
         ▼
 ┌───────────────────┐
-│  Notifier         │  sends ONE enriched incident, not N raw alerts
-└───────────────────┘
+│  Notifier         │  sends ONE enriched incident to Slack, not N raw
+└───────────────────┘  alerts (falls back to console if unconfigured)
         │
         ▼
   On-call feedback ──► retrains the scorer's learned weights for next time
@@ -79,7 +80,7 @@ Alert Sources (Prometheus Alertmanager / Datadog / generic webhook)
 alert-intelligence/
 ├── app/
 │   ├── main.py                  # FastAPI entrypoint — wires the full pipeline
-│   ├── config.py                # thresholds, correlation window, DB path
+│   ├── config.py                # thresholds, correlation window, Slack + k8s settings
 │   ├── models/schemas.py        # Pydantic models: Alert, Incident, Feedback
 │   ├── ingestion/
 │   │   ├── prometheus_adapter.py    # parses Alertmanager webhook payloads
@@ -88,14 +89,18 @@ alert-intelligence/
 │   │   ├── correlator.py        # groups alerts into incidents (topology-aware)
 │   │   ├── enricher.py          # attaches deploy/history/runbook context
 │   │   ├── scorer.py            # confidence scoring + feedback learning
-│   │   └── remediation.py       # matches incident pattern → action
+│   │   ├── remediation.py       # matches incident pattern → action
+│   │   └── k8s_executor.py      # real Kubernetes actions (dry-run by default)
 │   ├── storage/db.py             # SQLite persistence layer
-│   └── notifier/dispatcher.py    # formats + sends the final incident
-├── data/runbooks.yaml            # known alert patterns → remediation actions
+│   └── notifier/dispatcher.py    # formats + sends the final incident to Slack
+├── data/
+│   ├── runbooks.yaml             # known alert patterns → remediation actions
+│   └── service_k8s_map.yaml      # service name → namespace/deployment/labels
 ├── tests/test_correlator.py      # correlation logic unit tests
 ├── requirements.txt
 ├── Dockerfile
-└── docker-compose.yml
+├── docker-compose.yml
+└── .env                          # SLACK_WEBHOOK_URL (not committed — see below)
 ```
 
 ---
@@ -134,6 +139,80 @@ curl -X POST http://localhost:8000/incidents/1/feedback \
   -H "Content-Type: application/json" \
   -d '{"was_real": true, "resolved_by": "restart_pod"}'
 ```
+
+---
+
+## Slack notifications
+
+Incidents are sent to Slack via an Incoming Webhook. If no webhook is
+configured, the app falls back to printing the same message to console —
+so it runs fine without Slack too.
+
+**1. Create a Slack app and enable Incoming Webhooks**
+- Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → *From scratch*
+- Open **Incoming Webhooks** → toggle **On** → **Add New Webhook to Workspace**
+- Pick a channel and copy the generated webhook URL
+
+**2. Add it to a `.env` file in the project root** (never commit this file):
+```bash
+echo "SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz" > .env
+```
+
+That's it — restart the app and every incident notification posts straight
+to that Slack channel, with full context (deploy correlation, confidence
+score, suggested or applied action).
+
+---
+
+## Kubernetes auto-remediation
+
+When an incident's confidence score clears the automation threshold **and**
+its matched runbook action is marked `safe_to_automate: true`, the
+remediation engine calls a real Kubernetes action instead of just
+suggesting one.
+
+**Safety model — read this before enabling real actions:**
+- `config.KUBE_DRY_RUN` defaults to **`True`**. In dry-run mode, every action
+  logs exactly what it *would* do and returns without touching the cluster.
+- Every action is scoped to exactly one service via `data/service_k8s_map.yaml`
+  — there's no "act on everything" code path.
+- `MIN_CONFIDENCE_FOR_AUTOMATION` (default `85`) gates automation separately
+  from suggestion, so low-confidence incidents are only ever suggested, never
+  auto-run.
+
+**Setup:**
+
+1. Map each service you want to auto-remediate to its real Kubernetes
+   objects in `data/service_k8s_map.yaml`:
+   ```yaml
+   checkout-api:
+     namespace: production
+     deployment_name: checkout-api
+     label_selector: "app=checkout-api"
+   ```
+   Get the real values from your cluster:
+   ```bash
+   kubectl get deployments -n <namespace>
+   kubectl get pods -n <namespace> --show-labels
+   ```
+
+2. Leave `KUBE_DRY_RUN = True` while testing. Trigger a high-confidence
+   incident (send the same alert a few times, or submit feedback to raise
+   the learned trust score for that alertname) and confirm you see:
+   ```
+   [DRY-RUN] Would delete pods in ns='...' matching '...'
+   ```
+
+3. Only flip `KUBE_DRY_RUN = False` once you've verified the mapping is
+   correct, and ideally only against a disposable test cluster/deployment
+   first — never point this at production without a staging run.
+
+Supported actions out of the box (see `app/core/k8s_executor.py`):
+| Action | What it does |
+|---|---|
+| `restart_pod` | Deletes matching pods; the owning Deployment recreates them |
+| `scale_up` | Patches the Deployment's replica count up by 1 |
+| `rollback_deploy` | Runs `kubectl rollout undo` on the Deployment |
 
 ---
 
@@ -181,7 +260,7 @@ kubectl logs -n monitoring -l app=alert-intelligence -f
 ```
 
 Real Prometheus alerts (e.g. `TargetDown`, `KubePodCrashLooping`) will flow
-in, get correlated, enriched, and scored — live.
+in, get correlated, enriched, scored, and posted to Slack — live.
 
 ---
 
@@ -195,21 +274,24 @@ in, get correlated, enriched, and scored — live.
 - **Remediation is opt-in per action** — an action only auto-runs if it's
   explicitly marked `safe_to_automate: true` in `runbooks.yaml` **and**
   confidence clears the automation threshold. Nothing destructive runs
-  silently
+  silently, and real Kubernetes actions stay in dry-run mode until
+  explicitly enabled
+- **Secrets stay out of git** — the Slack webhook URL lives in a local
+  `.env` file (loaded via `python-dotenv`), excluded via `.gitignore`
 - **Everything is swappable** — ingestion adapters, the notifier, and
-  storage are thin layers so you can plug in real Slack, PagerDuty, or
-  Datadog APIs without touching the core pipeline
+  storage are thin layers so you can plug in PagerDuty or Datadog APIs
+  without touching the core pipeline
 
 ---
 
 ## Roadmap / ideas for contribution
 
 - [ ] Datadog and CloudWatch ingestion adapters
-- [ ] Real Slack / PagerDuty notifier integrations
-- [ ] Kubernetes-native remediation executor (real pod restarts, HPA scaling)
+- [ ] PagerDuty notifier integration
 - [ ] Service topology pulled from a real service catalog instead of a static dict
 - [ ] Web dashboard for incident history and scorer weight visibility
 - [ ] Postgres storage backend for multi-instance deployments
+- [ ] HPA-aware scaling instead of flat replica increments
 
 ---
 
