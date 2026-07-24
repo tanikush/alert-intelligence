@@ -2,11 +2,15 @@
 Dispatcher: takes a fully correlated + enriched + scored incident and sends
 ONE notification with full context, instead of N raw alerts.
 
-Stubbed to print a formatted message. Swap `_send` for a real Slack webhook
-POST or PagerDuty Events API v2 call in production.
+Sends to Slack via an Incoming Webhook if SLACK_WEBHOOK_URL is configured
+(see .env / config.py). If it's not configured, or the request fails for
+any reason, falls back to printing to console so the app never crashes
+just because Slack is unreachable.
 """
 
+import requests
 from app.models.schemas import Incident
+from app import config
 
 
 def notify(incident: Incident) -> None:
@@ -39,7 +43,25 @@ def _format(incident: Incident) -> str:
 
 
 def _send(message: str) -> None:
-    # Replace with: requests.post(SLACK_WEBHOOK_URL, json={"text": message})
+    if not config.SLACK_WEBHOOK_URL:
+        _print_to_console(message)
+        return
+
+    try:
+        response = requests.post(
+            config.SLACK_WEBHOOK_URL,
+            json={"text": message},
+            timeout=5,
+        )
+        response.raise_for_status()
+    except requests.RequestException as e:
+        # Never let a Slack outage take down alert processing - fall back
+        # to console so the incident is still visible somewhere.
+        print(f"[WARN] Slack notification failed: {e}")
+        _print_to_console(message)
+
+
+def _print_to_console(message: str) -> None:
     print("\n=== NOTIFICATION ===")
     print(message)
     print("====================\n")

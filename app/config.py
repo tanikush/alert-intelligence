@@ -4,8 +4,18 @@ by changing storage/db.py's connection logic.
 """
 
 from pathlib import Path
+from dotenv import load_dotenv
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Loads variables from a .env file in the project root (e.g. SLACK_WEBHOOK_URL)
+# into the environment. Safe to call even if .env doesn't exist.
+load_dotenv(BASE_DIR / ".env")
+
+# If unset, the notifier falls back to printing to console instead of
+# sending to Slack - so the app still runs fine without Slack configured.
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
 DB_PATH = BASE_DIR / "alert_intelligence.db"
 RUNBOOKS_PATH = BASE_DIR / "data" / "runbooks.yaml"
