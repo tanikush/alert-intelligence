@@ -38,21 +38,27 @@ Tested end-to-end — not just written, actually run against a real Kubernetes
 cluster, real Prometheus alerts, and a real Slack workspace.
 
 **Interactive API docs**
+
 ![API docs](screenshots/01-api-docs.png)
 
 **Pipeline processing a test alert — correlation, confidence scoring, suggested action**
+
 ![Pipeline test](screenshots/02-pipeline-test.png)
 
 **Deployed on a real Kubernetes cluster (kind) alongside Prometheus & Grafana**
+
 ![Kubernetes pods](screenshots/03-kubernetes-pods.png)
 
 **Real Prometheus/Alertmanager alerts flowing into the app**
+
 ![Prometheus alerts](screenshots/04-prometheus-alerts.png)
 
 **Enriched incident notification posted to Slack**
+
 ![Slack notification](screenshots/05-slack-notification.png)
 
 **Auto-remediation deciding to act, safely, in dry-run mode**
+
 ![Auto-remediation dry-run](screenshots/06-auto-remediation-dryrun.png)
 
 ---
