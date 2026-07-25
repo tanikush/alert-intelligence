@@ -190,7 +190,7 @@ echo "SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz" > .env
 ```
 
 That's it — restart the app and every incident notification posts straight
-to that Slack channel, with full context (deploy correlation, confidence
+to that Slack channels, with full context (deploy correlation, confidence
 score, suggested or applied action).
 
 ---
@@ -228,7 +228,7 @@ suggesting one.
    ```
 
 2. Leave `KUBE_DRY_RUN = True` while testing. Trigger a high-confidence
-   incident (send the same alert a few times, or submit feedback to raise
+   incidents (send the same alert a few times, or submit feedback to raise
    the learned trust score for that alertname) and confirm you see:
    ```
    [DRY-RUN] Would delete pods in ns='...' matching '...'
@@ -257,7 +257,7 @@ This has been tested end-to-end on a local **kind** cluster running the
 docker build -t alert-intelligence:v1 .
 ```
 
-**2. Load it into your cluster**
+**2. Loads it into your cluster**
 
 kind:
 ```bash
@@ -274,7 +274,7 @@ docker build -t alert-intelligence:v1 .
 kubectl apply -f k8s-deploy.yaml
 ```
 
-**4. Point Alertmanager at it**
+**4. Points Alertmanager at it**
 
 Add a receiver to your Alertmanager config pointing at the in-cluster service:
 ```yaml
@@ -298,7 +298,7 @@ in, get correlated, enriched, scored, and posted to Slack — live.
 ## Key design decisions
 
 - **SQLite by default** — swap for Postgres in `config.py` for production;
-  every storage call is a thin wrapper so this is a localized change
+  every storages calls is a thin wrapper so this is a localized change
 - **Rule-based, auditable scorer** — not a black-box ML model. On-call
   engineers can see exactly *why* an incident scored the way it did, which
   is what actually earns trust in an alerting system
