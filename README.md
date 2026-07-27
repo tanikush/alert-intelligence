@@ -319,10 +319,10 @@ in, get correlated, enriched, scored, and posted to Slack — live.
 
 - [ ] Datadog and CloudWatch ingestion adapters
 - [ ] PagerDuty notifier integration
-- [ ] Service topology pulled from a real service catalog instead of a static dict
+- [ ] Service topology pulled from a real services catalog instead of a static dict
 - [ ] Web dashboard for incident history and scorer weight visibility
 - [ ] Postgres storage backend for multi-instance deployments
-- [ ] HPA-aware scaling instead of flat replica increments
+- [ ] HPA-aware scaling instead of flats replica increments
 
 ---
 
