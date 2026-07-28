@@ -66,6 +66,10 @@ cluster, real Prometheus alerts, and a real Slack workspace.
 
 ![Live-dashboard-real-alerts](screenshots/07-live-dashboard-real-alerts.png)
 
+**Custom-rule-live-dashboard**
+
+![Custom-rule-live-dashboard](screenshots/08-custom-rule-live-dashboard.png)
+
 ---
 
 ## Architecture

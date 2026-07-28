@@ -1,0 +1,42 @@
+# Custom PrometheusRule - written by hand, not part of the default
+# kube-prometheus-stack install. The "release: monitoring" label is what
+# makes the Prometheus Operator automatically discover and load this rule
+# (it must match the Helm release name you installed the stack with).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alert-intelligence-custom-rules
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: alert-intelligence-demo
+      rules:
+        # Always-true condition - fires within ~1 minute of being applied.
+        # Proves the whole path (PrometheusRule -> Prometheus -> Alertmanager
+        # -> your app -> dashboard) works, without waiting on a real
+        # threshold to be crossed.
+        - alert: DemoCustomRuleFiring
+          expr: vector(1) > 0
+          for: 30s
+          labels:
+            severity: warning
+            service: alert-intelligence
+          annotations:
+            summary: "Custom PrometheusRule fired successfully"
+            description: "This is a hand-written rule (not a default kube-prometheus-stack rule), proving custom alerting works end-to-end."
+
+    - name: alert-intelligence-realistic
+      rules:
+        # Realistic condition: fires if the alert-intelligence service itself
+        # has been unreachable (up == 0) for more than 1 minute.
+        - alert: AlertIntelligenceServiceDown
+          expr: up{job="alert-intelligence"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: alert-intelligence
+          annotations:
+            summary: "alert-intelligence service is down"
+            description: "Prometheus has not been able to scrape alert-intelligence for over a minute."
