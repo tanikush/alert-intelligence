@@ -10,7 +10,6 @@ well-understood patterns.
 Built and tested end-to-end on a real Kubernetes cluster (kind) with a live
 Prometheus + Alertmanager + Grafana stack, and a real Slack workspace.
 
-![CI](https://github.com/tanikush/alert-intelligence/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -39,36 +38,22 @@ Tested end-to-end — not just written, actually run against a real Kubernetes
 cluster, real Prometheus alerts, and a real Slack workspace.
 
 **Interactive API docs**
-
 ![API docs](screenshots/01-api-docs.png)
 
 **Pipeline processing a test alert — correlation, confidence scoring, suggested action**
-
 ![Pipeline test](screenshots/02-pipeline-test.png)
 
 **Deployed on a real Kubernetes cluster (kind) alongside Prometheus & Grafana**
-
 ![Kubernetes pods](screenshots/03-kubernetes-pods.png)
 
 **Real Prometheus/Alertmanager alerts flowing into the app**
-
 ![Prometheus alerts](screenshots/04-prometheus-alerts.png)
 
 **Enriched incident notification posted to Slack**
-
 ![Slack notification](screenshots/05-slack-notification.png)
 
 **Auto-remediation deciding to act, safely, in dry-run mode**
-
 ![Auto-remediation dry-run](screenshots/06-auto-remediation-dryrun.png)
-
-**Live-dashboard-real-alerts**
-
-![Live-dashboard-real-alerts](screenshots/07-live-dashboard-real-alerts.png)
-
-**Custom-rule-live-dashboard**
-
-![Custom-rule-live-dashboard](screenshots/08-custom-rule-live-dashboard.png)
 
 ---
 
@@ -199,7 +184,7 @@ echo "SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz" > .env
 ```
 
 That's it — restart the app and every incident notification posts straight
-to that Slack channels, with full context (deploy correlation, confidence
+to that Slack channel, with full context (deploy correlation, confidence
 score, suggested or applied action).
 
 ---
@@ -237,7 +222,7 @@ suggesting one.
    ```
 
 2. Leave `KUBE_DRY_RUN = True` while testing. Trigger a high-confidence
-   incidents (send the same alert a few times, or submit feedback to raise
+   incident (send the same alert a few times, or submit feedback to raise
    the learned trust score for that alertname) and confirm you see:
    ```
    [DRY-RUN] Would delete pods in ns='...' matching '...'
@@ -266,7 +251,7 @@ This has been tested end-to-end on a local **kind** cluster running the
 docker build -t alert-intelligence:v1 .
 ```
 
-**2. Loads it into your cluster**
+**2. Load it into your cluster**
 
 kind:
 ```bash
@@ -283,7 +268,7 @@ docker build -t alert-intelligence:v1 .
 kubectl apply -f k8s-deploy.yaml
 ```
 
-**4. Points Alertmanager at it**
+**4. Point Alertmanager at it**
 
 Add a receiver to your Alertmanager config pointing at the in-cluster service:
 ```yaml
@@ -307,7 +292,7 @@ in, get correlated, enriched, scored, and posted to Slack — live.
 ## Key design decisions
 
 - **SQLite by default** — swap for Postgres in `config.py` for production;
-  every storages calls is a thin wrapper so this is a localized change
+  every storage call is a thin wrapper so this is a localized change
 - **Rule-based, auditable scorer** — not a black-box ML model. On-call
   engineers can see exactly *why* an incident scored the way it did, which
   is what actually earns trust in an alerting system
@@ -328,10 +313,10 @@ in, get correlated, enriched, scored, and posted to Slack — live.
 
 - [ ] Datadog and CloudWatch ingestion adapters
 - [ ] PagerDuty notifier integration
-- [ ] Service topology pulled from a real services catalog instead of a static dict
+- [ ] Service topology pulled from a real service catalog instead of a static dict
 - [ ] Web dashboard for incident history and scorer weight visibility
 - [ ] Postgres storage backend for multi-instance deployments
-- [ ] HPA-aware scaling instead of flats replica increments
+- [ ] HPA-aware scaling instead of flat replica increments
 
 ---
 
