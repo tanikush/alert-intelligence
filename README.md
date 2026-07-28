@@ -3,13 +3,16 @@
 **A DevOps alert-fatigue solver.** Ingests raw alerts from Prometheus, Datadog, or
 any generic webhook, correlates them into single incidents, enriches them with
 real context (recent deploys, past resolutions, matching runbooks), scores
-them by confidence, sends a single enriched notification to Slack, and
-safely auto-applies remediation — including real Kubernetes actions — for
-well-understood patterns.
+them by confidence, sends a single enriched notification to Slack, shows
+everything on a live dashboard, and safely auto-applies remediation —
+including real Kubernetes actions — for well-understood patterns.
 
 Built and tested end-to-end on a real Kubernetes cluster (kind) with a live
-Prometheus + Alertmanager + Grafana stack, and a real Slack workspace.
+Prometheus + Alertmanager + Grafana stack, a real Slack workspace, a custom
+Prometheus alerting rule, and a CI/CD pipeline that builds and publishes the
+Docker image automatically.
 
+![CI](https://github.com/tanikush/alert-intelligence/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -35,25 +38,40 @@ This project is a minimal, extensible core for that missing layer.
 ## Proof it works
 
 Tested end-to-end — not just written, actually run against a real Kubernetes
-cluster, real Prometheus alerts, and a real Slack workspace.
+cluster, real Prometheus alerts, a real Slack workspace, and a real CI/CD
+pipeline.
 
 **Interactive API docs**
+
 ![API docs](screenshots/01-api-docs.png)
 
 **Pipeline processing a test alert — correlation, confidence scoring, suggested action**
+
 ![Pipeline test](screenshots/02-pipeline-test.png)
 
 **Deployed on a real Kubernetes cluster (kind) alongside Prometheus & Grafana**
+
 ![Kubernetes pods](screenshots/03-kubernetes-pods.png)
 
 **Real Prometheus/Alertmanager alerts flowing into the app**
+
 ![Prometheus alerts](screenshots/04-prometheus-alerts.png)
 
 **Enriched incident notification posted to Slack**
+
 ![Slack notification](screenshots/05-slack-notification.png)
 
 **Auto-remediation deciding to act, safely, in dry-run mode**
+
 ![Auto-remediation dry-run](screenshots/06-auto-remediation-dryrun.png)
+
+**Live dashboard showing real cluster alerts as they arrive**
+
+![Live dashboard with real alerts](screenshots/07-live-dashboard-real-alerts.png)
+
+**A custom, hand-written PrometheusRule firing and flowing through the full pipeline**
+
+![Custom rule on live dashboard](screenshots/08-custom-rule-live-dashboard.png)
 
 ---
 
@@ -94,6 +112,11 @@ Alert Sources (Prometheus Alertmanager / Datadog / generic webhook)
 └───────────────────┘  alerts (falls back to console if unconfigured)
         │
         ▼
+┌───────────────────┐
+│  Dashboard        │  live view of every incident, confidence score, and
+└───────────────────┘  remediation status, polling every 4 seconds
+        │
+        ▼
   On-call feedback ──► retrains the scorer's learned weights for next time
 ```
 
@@ -103,9 +126,11 @@ Alert Sources (Prometheus Alertmanager / Datadog / generic webhook)
 
 ```
 alert-intelligence/
+├── .github/workflows/ci.yml      # tests + Docker build/push on every push to main
 ├── app/
 │   ├── main.py                  # FastAPI entrypoint — wires the full pipeline
 │   ├── config.py                # thresholds, correlation window, Slack + k8s settings
+│   ├── dashboard_router.py      # serves the live dashboard + /api/incidents
 │   ├── models/schemas.py        # Pydantic models: Alert, Incident, Feedback
 │   ├── ingestion/
 │   │   ├── prometheus_adapter.py    # parses Alertmanager webhook payloads
@@ -118,9 +143,11 @@ alert-intelligence/
 │   │   └── k8s_executor.py      # real Kubernetes actions (dry-run by default)
 │   ├── storage/db.py             # SQLite persistence layer
 │   └── notifier/dispatcher.py    # formats + sends the final incident to Slack
+├── static/dashboard.html          # live incident dashboard (vanilla JS, no build step)
 ├── data/
 │   ├── runbooks.yaml             # known alert patterns → remediation actions
 │   └── service_k8s_map.yaml      # service name → namespace/deployment/labels
+├── custom-prometheus-rules.yaml   # hand-written PrometheusRule, not from the default stack
 ├── tests/test_correlator.py      # correlation logic unit tests
 ├── requirements.txt
 ├── Dockerfile
@@ -144,6 +171,7 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 Open interactive API docs: **http://localhost:8000/docs**
+Open the live dashboard: **http://localhost:8000/dashboard**
 
 Send a test alert:
 ```bash
@@ -164,6 +192,19 @@ curl -X POST http://localhost:8000/incidents/1/feedback \
   -H "Content-Type: application/json" \
   -d '{"was_real": true, "resolved_by": "restart_pod"}'
 ```
+
+---
+
+## Live dashboard
+
+`GET /dashboard` serves a small, dependency-free HTML page that polls
+`GET /api/incidents` every 4 seconds and renders every incident with a
+color-coded confidence bar, severity badge, and remediation status —
+no separate frontend build, no framework, just one static file served by
+FastAPI.
+
+Useful when demoing the project live: alerts you trigger (or real cluster
+alerts) show up within seconds without needing to read raw JSON or logs.
 
 ---
 
@@ -241,6 +282,53 @@ Supported actions out of the box (see `app/core/k8s_executor.py`):
 
 ---
 
+## Custom Prometheus alerting rule
+
+`custom-prometheus-rules.yaml` is a hand-written `PrometheusRule` — not one
+of the default rules that ship with `kube-prometheus-stack` — proving the
+whole alerting stack is understood end-to-end, not just consumed.
+
+It defines two rules:
+- `DemoCustomRuleFiring` — an always-true condition (`vector(1) > 0`) that
+  fires within ~30 seconds, useful for proving the full path (Prometheus →
+  Alertmanager → this app → Slack → dashboard) works without waiting on a
+  real threshold
+- `AlertIntelligenceServiceDown` — a realistic rule that fires if the app
+  itself becomes unreachable (`up{job="alert-intelligence"} == 0`) for
+  over a minute
+
+Apply it to a cluster running `kube-prometheus-stack`:
+```bash
+kubectl apply -f custom-prometheus-rules.yaml
+kubectl get prometheusrules -n monitoring
+```
+The `release: monitoring` label in the file must match your Helm release
+name so the Prometheus Operator auto-discovers it.
+
+---
+
+## CI/CD pipeline
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main`:
+
+1. **`test`** — installs dependencies and runs the `pytest` suite
+2. **`docker-build`** — only runs if tests pass; builds the Docker image,
+   and on a push to `main`, pushes it to Docker Hub tagged both `latest`
+   and with the commit SHA
+
+To enable the Docker Hub push in your own fork, add two repository secrets
+under **Settings → Secrets and variables → Actions**:
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN` (a Docker Hub access token, not your password)
+
+Once set up, anyone can run the project without building it themselves:
+```bash
+docker pull <your-dockerhub-username>/alert-intelligence:latest
+docker run -p 8000:8000 <your-dockerhub-username>/alert-intelligence:latest
+```
+
+---
+
 ## Deploying to a real Kubernetes cluster
 
 This has been tested end-to-end on a local **kind** cluster running the
@@ -285,7 +373,12 @@ kubectl logs -n monitoring -l app=alert-intelligence -f
 ```
 
 Real Prometheus alerts (e.g. `TargetDown`, `KubePodCrashLooping`) will flow
-in, get correlated, enriched, scored, and posted to Slack — live.
+in, get correlated, enriched, scored, and posted to Slack — live. View them
+visually via the dashboard with:
+```bash
+kubectl port-forward -n monitoring svc/alert-intelligence 8080:8000
+```
+then opening `http://localhost:8080/dashboard`.
 
 ---
 
@@ -302,7 +395,10 @@ in, get correlated, enriched, scored, and posted to Slack — live.
   silently, and real Kubernetes actions stay in dry-run mode until
   explicitly enabled
 - **Secrets stay out of git** — the Slack webhook URL lives in a local
-  `.env` file (loaded via `python-dotenv`), excluded via `.gitignore`
+  `.env` file (loaded via `python-dotenv`), excluded via `.gitignore`;
+  Docker Hub credentials live in GitHub Actions secrets, never in code
+- **Dashboard has zero build step** — plain HTML/CSS/JS served directly by
+  FastAPI, so there's no separate frontend toolchain to maintain
 - **Everything is swappable** — ingestion adapters, the notifier, and
   storage are thin layers so you can plug in PagerDuty or Datadog APIs
   without touching the core pipeline
@@ -313,8 +409,7 @@ in, get correlated, enriched, scored, and posted to Slack — live.
 
 - [ ] Datadog and CloudWatch ingestion adapters
 - [ ] PagerDuty notifier integration
-- [ ] Service topology pulled from a real service catalog instead of a static dict
-- [ ] Web dashboard for incident history and scorer weight visibility
+- [ ] Service topology pulled dynamically from Kubernetes labels/annotations instead of a static dict
 - [ ] Postgres storage backend for multi-instance deployments
 - [ ] HPA-aware scaling instead of flat replica increments
 
