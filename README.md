@@ -10,6 +10,7 @@ well-understood patterns.
 Built and tested end-to-end on a real Kubernetes cluster (kind) with a live
 Prometheus + Alertmanager + Grafana stack, and a real Slack workspace.
 
+![CI](https://github.com/tanikush/alert-intelligence/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
