@@ -164,3 +164,12 @@ def set_alertname_weight(alertname: str, weight: int) -> None:
                ON CONFLICT(alertname) DO UPDATE SET weight = excluded.weight""",
             (alertname, weight),
         )
+
+def list_incidents(limit: int = 50) -> list:
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM incidents ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [_row_to_incident(r) for r in rows]
+
+    

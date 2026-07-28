@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Alert Intelligence — Incident Feed</title>
+<style>
+  :root {
+    --bg: #0B0E14;
+    --panel: #12161F;
+    --border: #232838;
+    --text: #E4E7EC;
+    --muted: #7B8496;
+    --critical: #FF5D5D;
+    --warning: #FFB84D;
+    --info: #5B9DFF;
+    --safe: #4ADE80;
+    --mono: "SF Mono", "JetBrains Mono", "Consolas", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    padding: 32px;
+    min-height: 100vh;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin: 0;
+  }
+
+  h1::before {
+    content: "● ";
+    color: var(--safe);
+  }
+
+  #status {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  #feed {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 920px;
+  }
+
+  .incident {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+
+  .incident.critical { border-left-color: var(--critical); }
+  .incident.warning { border-left-color: var(--warning); }
+  .incident.info { border-left-color: var(--info); }
+
+  .incident-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .incident-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .badge.critical { background: rgba(255,93,93,0.15); color: var(--critical); }
+  .badge.warning { background: rgba(255,184,77,0.15); color: var(--warning); }
+  .badge.info { background: rgba(91,157,255,0.15); color: var(--info); }
+
+  .incident-meta {
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  .confidence-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .confidence-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+
+  .confidence-label {
+    font-size: 12px;
+    color: var(--muted);
+    width: 70px;
+    text-align: right;
+  }
+
+  .action-line {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .action-line strong {
+    color: var(--text);
+  }
+
+  .auto-tag {
+    color: var(--safe);
+  }
+
+  #empty {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 40px 0;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Alert Intelligence — Incident Feed</h1>
+  <span id="status">connecting…</span>
+</header>
+
+<div id="feed"></div>
+<div id="empty" style="display:none;">No incidents yet. Send a test alert to see it appear here.</div>
+
+<script>
+function severityClass(sev) {
+  if (sev === "critical") return "critical";
+  if (sev === "warning") return "warning";
+  return "info";
+}
+
+function confidenceColor(score) {
+  if (score >= 85) return "#4ADE80";
+  if (score >= 60) return "#FFB84D";
+  return "#7B8496";
+}
+
+function renderIncident(inc) {
+  const sevClass = severityClass(inc.severity);
+  const color = confidenceColor(inc.confidence_score);
+  const actionText = inc.auto_remediated
+    ? `<span class="auto-tag">✓ auto-remediated:</span> <strong>${inc.suggested_action}</strong>`
+    : inc.suggested_action
+      ? `suggested: <strong>${inc.suggested_action}</strong>`
+      : "no known remediation";
+
+  return `
+    <div class="incident ${sevClass}">
+      <div class="incident-top">
+        <span class="incident-title">#${inc.id} — ${inc.primary_service}</span>
+        <span class="badge ${sevClass}">${inc.severity}</span>
+      </div>
+      <div class="incident-meta">
+        alerts: ${inc.alertnames.join(", ")} (×${inc.alert_count}) · status: ${inc.status}
+      </div>
+      <div class="confidence-row">
+        <div class="confidence-track">
+          <div class="confidence-fill" style="width:${inc.confidence_score}%; background:${color};"></div>
+        </div>
+        <div class="confidence-label">${inc.confidence_score}/100</div>
+      </div>
+      <div class="action-line">${actionText}</div>
+    </div>
+  `;
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/incidents");
+    const incidents = await res.json();
+    const feed = document.getElementById("feed");
+    const empty = document.getElementById("empty");
+
+    if (incidents.length === 0) {
+      feed.innerHTML = "";
+      empty.style.display = "block";
+    } else {
+      empty.style.display = "none";
+      feed.innerHTML = incidents.map(renderIncident).join("");
+    }
+    document.getElementById("status").textContent =
+      "live · " + incidents.length + " incident(s) · updated " + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById("status").textContent = "connection lost — retrying…";
+  }
+}
+
+refresh();
+setInterval(refresh, 4000);
+</script>
+
+</body>
+</html>

@@ -13,8 +13,10 @@ from app.ingestion.prometheus_adapter import parse_alertmanager_payload
 from app.core import correlator, enricher, scorer, remediation
 from app.notifier import dispatcher
 from app.storage import db
+from app.dashboard_router import router as dashboard_router
 
 app = FastAPI(title="Alert Intelligence Layer")
+app.include_router(dashboard_router)
 
 
 @app.on_event("startup")
