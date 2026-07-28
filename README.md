@@ -323,8 +323,8 @@ under **Settings → Secrets and variables → Actions**:
 
 Once set up, anyone can run the project without building it themselves:
 ```bash
-docker pull <your-dockerhub-username>/alert-intelligence:latest
-docker run -p 8000:8000 <your-dockerhub-username>/alert-intelligence:latest
+docker pull tanishakushwah/alert-intelligence:latest
+docker run -p 8000:8000 tanishakushwah/alert-intelligence:latest
 ```
 
 ---
@@ -343,7 +343,7 @@ docker build -t alert-intelligence:v1 .
 
 kind:
 ```bash
-kind load docker-image alert-intelligence:v1 --name <your-cluster-name>
+kind load docker-image alert-intelligence:v1 --name alert-cluster
 ```
 minikube:
 ```bash
