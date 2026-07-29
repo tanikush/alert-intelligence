@@ -1,0 +1,30 @@
+# Grants the alert-intelligence pod read-only permission to list/get
+# Service objects in the monitoring namespace - needed so the dynamic
+# topology feature (app/core/k8s_topology.py) can read Service annotations.
+# Deliberately scoped to just "services" + "get/list/watch" - no write
+# access, no access to other resource types, no access outside this
+# namespace.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: alert-intelligence-topology-reader
+  namespace: monitoring
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alert-intelligence-topology-reader-binding
+  namespace: monitoring
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: monitoring
+roleRef:
+  kind: Role
+  name: alert-intelligence-topology-reader
+  apiGroup: rbac.authorization.k8s.io

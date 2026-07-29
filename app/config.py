@@ -43,3 +43,9 @@ KUBE_DRY_RUN = True
 KUBECONFIG_PATH = None
 
 SERVICE_K8S_MAP_PATH = BASE_DIR / "data" / "service_k8s_map.yaml"
+
+
+# --- Dynamic Kubernetes topology settings ---
+USE_DYNAMIC_TOPOLOGY = True
+K8S_TOPOLOGY_NAMESPACE = "monitoring"
+TOPOLOGY_CACHE_TTL_SECONDS = 60

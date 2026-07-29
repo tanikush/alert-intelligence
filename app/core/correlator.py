@@ -8,32 +8,27 @@ Strategy (kept simple and auditable on purpose - no black box):
    with the upstream/root service marked as primary_service.
 3. Everything else opens a new incident.
 
-The service topology map is intentionally simple (a dict of
-service -> [services that depend on it]). In a real deployment this would
-be pulled from a service catalog / Kubernetes labels / Backstage, but the
-correlator doesn't care where it comes from - just that it's a dict.
+Service topology is fetched dynamically from Kubernetes (see
+app/core/k8s_topology.py) with a static fallback - the correlator itself
+doesn't care where the topology comes from, just that it's a
+{downstream: upstream} dict.
 """
 
 from datetime import datetime, timedelta
 from app.models.schemas import Alert, Incident
 from app.storage import db
+from app.core import k8s_topology
 from app import config
-
-# service -> list of downstream services that commonly alert as a side effect
-SERVICE_TOPOLOGY = {
-    "checkout-api": ["payments-service", "inventory-service"],
-    "payments-service": ["fraud-detector"],
-}
 
 
 def _find_root_service(service: str) -> str:
     """If `service` is a known downstream of something else, return the
     upstream root so alerts get grouped under the actual cause, not the
-    symptom."""
-    for root, downstream in SERVICE_TOPOLOGY.items():
-        if service in downstream:
-            return root
-    return service
+    symptom. Topology is looked up fresh each call (k8s_topology caches
+    internally on a TTL), so newly annotated services are picked up
+    without restarting this app."""
+    topology = k8s_topology.get_topology()
+    return topology.get(service, service)
 
 
 def correlate(alert: Alert) -> Incident:
