@@ -4,7 +4,8 @@ metadata:
   name: alert-intelligence
   namespace: monitoring
 spec:
-  replicas: 1
+  replicas: 2   # was 1 - now 2 to prove multiple instances can safely
+                # share the same Postgres database at once
   selector:
     matchLabels:
       app: alert-intelligence
@@ -15,10 +16,13 @@ spec:
     spec:
       containers:
         - name: alert-intelligence
-          image: alert-intelligence:v1
+          image: alert-intelligence:v2
           imagePullPolicy: Never
           ports:
             - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql+psycopg2://alertuser:alertpass123@postgres.monitoring.svc.cluster.local:5432/alertdb"
 ---
 apiVersion: v1
 kind: Service

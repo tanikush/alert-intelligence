@@ -17,7 +17,10 @@ load_dotenv(BASE_DIR / ".env")
 # sending to Slack - so the app still runs fine without Slack configured.
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
-DB_PATH = BASE_DIR / "alert_intelligence.db"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"sqlite:///{BASE_DIR / 'alert_intelligence.db'}"
+)
 RUNBOOKS_PATH = BASE_DIR / "data" / "runbooks.yaml"
 
 # Alerts within this many seconds of each other, on the same/related service,

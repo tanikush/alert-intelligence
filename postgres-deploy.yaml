@@ -1,0 +1,56 @@
+# Postgres for the alert-intelligence app - a single Postgres instance
+# that multiple app replicas can all safely connect to, unlike SQLite
+# (a single file, unsafe for concurrent multi-instance writes).
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: monitoring
+type: Opaque
+stringData:
+  POSTGRES_USER: alertuser
+  POSTGRES_PASSWORD: alertpass123
+  POSTGRES_DB: alertdb
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-storage
+          emptyDir: {}   # demo only - use a PersistentVolumeClaim for real data durability
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: monitoring
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

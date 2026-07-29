@@ -1,16 +1,19 @@
 # Alert Intelligence Layer
 
 **A DevOps alert-fatigue solver.** Ingests raw alerts from Prometheus, Datadog, or
-any generic webhook, correlates them into single incidents, enriches them with
-real context (recent deploys, past resolutions, matching runbooks), scores
-them by confidence, sends a single enriched notification to Slack, shows
+any generic webhook, correlates them into single incidents using service
+topology discovered live from Kubernetes, enriches them with real context
+(recent deploys, past resolutions, matching runbooks), scores them by
+confidence, sends a single enriched notification to Slack, shows
 everything on a live dashboard, and safely auto-applies remediation —
-including real Kubernetes actions — for well-understood patterns.
+including real Kubernetes actions — for well-understood patterns. Runs on
+SQLite locally or Postgres in production, safely across multiple replicas.
 
 Built and tested end-to-end on a real Kubernetes cluster (kind) with a live
 Prometheus + Alertmanager + Grafana stack, a real Slack workspace, a custom
-Prometheus alerting rule, and a CI/CD pipeline that builds and publishes the
-Docker image automatically.
+Prometheus alerting rule, a CI/CD pipeline that builds and publishes the
+Docker image automatically, dynamic topology discovery via the Kubernetes
+API, and a real Postgres database shared across 2 app replicas.
 
 ![CI](https://github.com/tanikush/alert-intelligence/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
@@ -129,7 +132,7 @@ alert-intelligence/
 ├── .github/workflows/ci.yml      # tests + Docker build/push on every push to main
 ├── app/
 │   ├── main.py                  # FastAPI entrypoint — wires the full pipeline
-│   ├── config.py                # thresholds, correlation window, Slack + k8s settings
+│   ├── config.py                # thresholds, correlation window, Slack + k8s + DB settings
 │   ├── dashboard_router.py      # serves the live dashboard + /api/incidents
 │   ├── models/schemas.py        # Pydantic models: Alert, Incident, Feedback
 │   ├── ingestion/
@@ -137,17 +140,20 @@ alert-intelligence/
 │   │   └── generic_webhook.py       # parses plain JSON payloads
 │   ├── core/
 │   │   ├── correlator.py        # groups alerts into incidents (topology-aware)
+│   │   ├── k8s_topology.py      # discovers service topology from K8s annotations
 │   │   ├── enricher.py          # attaches deploy/history/runbook context
 │   │   ├── scorer.py            # confidence scoring + feedback learning
 │   │   ├── remediation.py       # matches incident pattern → action
 │   │   └── k8s_executor.py      # real Kubernetes actions (dry-run by default)
-│   ├── storage/db.py             # SQLite persistence layer
+│   ├── storage/db.py             # SQLAlchemy storage layer (SQLite or Postgres)
 │   └── notifier/dispatcher.py    # formats + sends the final incident to Slack
 ├── static/dashboard.html          # live incident dashboard (vanilla JS, no build step)
 ├── data/
 │   ├── runbooks.yaml             # known alert patterns → remediation actions
 │   └── service_k8s_map.yaml      # service name → namespace/deployment/labels
 ├── custom-prometheus-rules.yaml   # hand-written PrometheusRule, not from the default stack
+├── rbac-topology-reader.yaml      # read-only RBAC for dynamic topology discovery
+├── postgres-deploy.yaml           # Postgres Deployment + Secret for the cluster
 ├── tests/test_correlator.py      # correlation logic unit tests
 ├── requirements.txt
 ├── Dockerfile
@@ -323,9 +329,38 @@ under **Settings → Secrets and variables → Actions**:
 
 Once set up, anyone can run the project without building it themselves:
 ```bash
-docker pull tanishakushwah/alert-intelligence:latest
-docker run -p 8000:8000 tanishakushwah/alert-intelligence:latest
+docker pull <your-dockerhub-username>/alert-intelligence:latest
+docker run -p 8000:8000 <your-dockerhub-username>/alert-intelligence:latest
 ```
+
+---
+
+## Postgres and multi-instance deployments
+
+By default this runs on SQLite (`DATABASE_URL` unset) - zero setup, great
+for local development. But SQLite is a single file: two app instances
+writing to it at once isn't safe and doesn't scale.
+
+The storage layer (`app/storage/db.py`) is built on SQLAlchemy Core, so
+the exact same code works against Postgres too - only `DATABASE_URL`
+changes, nothing else. This has been tested against a real running
+Postgres instance, not just checked for SQL-dialect compatibility.
+
+**To run with Postgres (e.g. in Kubernetes):**
+
+1. Deploy Postgres (see `postgres-deploy.yaml` for a ready-to-use example
+   with a Secret for credentials)
+2. Set `DATABASE_URL` on the app deployment:
+   ```yaml
+   env:
+     - name: DATABASE_URL
+       value: "postgresql+psycopg2://user:password@postgres-host:5432/dbname"
+   ```
+3. Scale to multiple replicas safely - `k8s-deploy.yaml` runs 2 replicas by
+   default, both pointing at the same Postgres instance. Kubernetes
+   load-balances requests between them; every replica sees the same
+   incident data, since it's shared in Postgres instead of split across
+   separate SQLite files.
 
 ---
 
@@ -343,7 +378,7 @@ docker build -t alert-intelligence:v1 .
 
 kind:
 ```bash
-kind load docker-image alert-intelligence:v1 --name alert-cluster
+kind load docker-image alert-intelligence:v1 --name <your-cluster-name>
 ```
 minikube:
 ```bash
@@ -351,8 +386,9 @@ eval $(minikube docker-env)
 docker build -t alert-intelligence:v1 .
 ```
 
-**3. Deploy**
+**3. Deploy Postgres, then the app**
 ```bash
+kubectl apply -f postgres-deploy.yaml
 kubectl apply -f k8s-deploy.yaml
 ```
 
@@ -382,10 +418,40 @@ then opening `http://localhost:8080/dashboard`.
 
 ---
 
+## Dynamic Kubernetes topology
+
+Service dependency mapping used to be a hardcoded Python dictionary. Now
+it's read live from Kubernetes: annotate any Service with which upstream
+service it depends on, and the correlator picks it up automatically - no
+code change or redeploy required.
+
+```bash
+kubectl annotate service payments-service -n monitoring \
+  alert-intelligence.io/upstream=checkout-api --overwrite
+```
+
+How it works (see `app/core/k8s_topology.py`):
+- Uses the Kubernetes Python client (in-cluster config, scoped via RBAC -
+  see `rbac-topology-reader.yaml` - to read-only access on Services in one
+  namespace)
+- Caches the result for 60 seconds so correlation doesn't hit the
+  Kubernetes API on every single alert
+- Falls back to a small static map if the cluster is unreachable, so the
+  app - and its unit tests - keep working without a live cluster
+
+**Required RBAC** (grants read-only access to Service objects, nothing else):
+```bash
+kubectl apply -f rbac-topology-reader.yaml
+```
+
+---
+
 ## Key design decisions
 
-- **SQLite by default** — swap for Postgres in `config.py` for production;
-  every storage call is a thin wrapper so this is a localized change
+- **SQLite by default, Postgres for production** — both work through the
+  same SQLAlchemy-based storage layer; only `DATABASE_URL` changes.
+  Verified against a real Postgres instance, and safe for multiple app
+  replicas sharing one database
 - **Rule-based, auditable scorer** — not a black-box ML model. On-call
   engineers can see exactly *why* an incident scored the way it did, which
   is what actually earns trust in an alerting system
@@ -394,9 +460,13 @@ then opening `http://localhost:8080/dashboard`.
   confidence clears the automation threshold. Nothing destructive runs
   silently, and real Kubernetes actions stay in dry-run mode until
   explicitly enabled
+- **Topology is discovered, not hardcoded** — read live from Kubernetes
+  Service annotations, scoped by RBAC to read-only access, with a static
+  fallback so the app never depends on the cluster being reachable
 - **Secrets stay out of git** — the Slack webhook URL lives in a local
   `.env` file (loaded via `python-dotenv`), excluded via `.gitignore`;
-  Docker Hub credentials live in GitHub Actions secrets, never in code
+  Docker Hub and Postgres credentials live in GitHub Actions secrets /
+  Kubernetes Secrets, never in code
 - **Dashboard has zero build step** — plain HTML/CSS/JS served directly by
   FastAPI, so there's no separate frontend toolchain to maintain
 - **Everything is swappable** — ingestion adapters, the notifier, and
@@ -409,9 +479,8 @@ then opening `http://localhost:8080/dashboard`.
 
 - [ ] Datadog and CloudWatch ingestion adapters
 - [ ] PagerDuty notifier integration
-- [ ] Service topology pulled dynamically from Kubernetes labels/annotations instead of a static dict
-- [ ] Postgres storage backend for multi-instance deployments
 - [ ] HPA-aware scaling instead of flat replica increments
+- [ ] Persistent volume for Postgres (current manifest uses emptyDir, fine for demos, not for real data durability)
 
 ---
 
