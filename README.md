@@ -486,15 +486,58 @@ kubectl apply -f rbac-topology-reader.yaml
 - **Topology is discovered, not hardcoded** — read live from Kubernetes
   Service annotations, scoped by RBAC to read-only access, with a static
   fallback so the app never depends on the cluster being reachable
-- **Secrets stay out of git** — the Slack webhook URL lives in a local
-  `.env` file (loaded via `python-dotenv`), excluded via `.gitignore`;
-  Docker Hub and Postgres credentials live in GitHub Actions secrets /
-  Kubernetes Secrets, never in code
+- **Secrets stay out of git** — the Slack webhook URL and API key live in a
+  local `.env` file (loaded via `python-dotenv`), excluded via
+  `.gitignore`; Docker Hub and Postgres credentials live in GitHub Actions
+  secrets / Kubernetes Secrets, never in code
+- **Write endpoints are authenticated, read endpoints aren't** — webhook
+  ingestion and feedback submission require an API key (checked via
+  `X-API-Key` or `Authorization: Bearer`); the dashboard and incident-lookup
+  endpoints stay open since they're for internal viewing, not external
+  systems pushing data in
 - **Dashboard has zero build step** — plain HTML/CSS/JS served directly by
   FastAPI, so there's no separate frontend toolchain to maintain
 - **Everything is swappable** — ingestion adapters, the notifier, and
   storage are thin layers so you can plug in PagerDuty or Datadog APIs
   without touching the core pipeline
+
+---
+
+## API authentication
+
+Webhook and feedback endpoints (`/webhook/generic`, `/webhook/prometheus`,
+`/incidents/{id}/feedback`) require an API key. Read-only/internal
+endpoints (`/dashboard`, `/api/incidents`, `/docs`, `GET /incidents/{id}`)
+stay open, since they're for viewing during a demo, not for external
+systems pushing data in.
+
+**Setup:**
+
+1. Generate a random key (don't hand-write one - it needs to be
+   unguessable to actually add security):
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+2. Add it to `.env`:
+   ```bash
+   echo "API_KEY=<paste the generated key>" >> .env
+   ```
+3. Restart the app. Protected endpoints now require the key, sent either way:
+   ```bash
+   curl -X POST http://localhost:8000/webhook/generic \
+     -H "X-API-Key: <your key>" \
+     -H "Content-Type: application/json" -d '{ ... }'
+   ```
+   or via `Authorization: Bearer <your key>` (this is what Alertmanager's
+   `http_config.authorization` sends, so both real Alertmanager and manual
+   `curl`/Postman testing work without extra wrangling).
+
+**If `API_KEY` is unset** (e.g. a fresh clone with no `.env` configured
+yet), authentication is skipped entirely and a warning is logged - so the
+app still runs out of the box for local development, but this should never
+be left unset anywhere beyond that.
+
+See `.env.example` for the full list of environment variables this app reads.
 
 ---
 
