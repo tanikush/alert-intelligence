@@ -22,7 +22,7 @@ def _format(incident: Incident) -> str:
     deploys = incident.context.get("recent_deploys", [])
     deploy_line = (
         f"⚠️  Deployed {deploys[0]['version']} by {deploys[0]['author']} "
-        f"shortly before this fired"
+        f"to {incident.environment} shortly before this fired"
         if deploys else "No recent deploys detected"
     )
     action_line = (
@@ -34,7 +34,7 @@ def _format(incident: Incident) -> str:
     )
 
     return (
-        f"[Incident #{incident.id}] {incident.primary_service} "
+        f"[Incident #{incident.id}] {incident.primary_service} [{incident.environment}] "
         f"({incident.severity}, confidence {incident.confidence_score}/100)\n"
         f"  Alerts merged: {', '.join(incident.alertnames)} (x{incident.alert_count})\n"
         f"  {deploy_line}\n"

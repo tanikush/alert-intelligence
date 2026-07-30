@@ -26,6 +26,7 @@ incidents_table = Table(
     "incidents", metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("primary_service", String),
+    Column("environment", String, default="prod"),
     Column("alertnames", Text),
     Column("alert_count", Integer),
     Column("severity", String),
@@ -55,6 +56,7 @@ def _row_to_incident(row) -> Incident:
     return Incident(
         id=m["id"],
         primary_service=m["primary_service"],
+        environment=m["environment"],
         alertnames=json.loads(m["alertnames"]),
         alert_count=m["alert_count"],
         severity=m["severity"],
@@ -73,6 +75,7 @@ def create_incident(incident: Incident) -> Incident:
         result = conn.execute(
             incidents_table.insert().values(
                 primary_service=incident.primary_service,
+                environment=incident.environment,
                 alertnames=json.dumps(incident.alertnames),
                 alert_count=incident.alert_count,
                 severity=incident.severity,
@@ -108,11 +111,12 @@ def update_incident(incident: Incident) -> None:
         )
 
 
-def find_open_incident(service: str, window_start):
+def find_open_incident(service: str, environment: str, window_start):
     with engine.connect() as conn:
         row = conn.execute(
             incidents_table.select()
             .where(incidents_table.c.primary_service == service)
+            .where(incidents_table.c.environment == environment)
             .where(incidents_table.c.status == "open")
             .where(incidents_table.c.last_seen >= window_start.isoformat())
             .order_by(incidents_table.c.last_seen.desc())
@@ -189,3 +193,4 @@ def set_alertname_weight(alertname: str, weight: int) -> None:
                     alertname=alertname, weight=weight
                 )
             )
+            

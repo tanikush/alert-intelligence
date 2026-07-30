@@ -24,6 +24,7 @@ class Alert(BaseModel):
 class Incident(BaseModel):
     id: Optional[int] = None
     primary_service: str
+    environment: str = "prod"
     alertnames: list[str]
     alert_count: int
     severity: str

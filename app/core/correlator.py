@@ -33,9 +33,18 @@ def _find_root_service(service: str) -> str:
 
 def correlate(alert: Alert) -> Incident:
     root_service = _find_root_service(alert.service)
+    # Environment comes from the alert's labels (e.g. Prometheus/Alertmanager
+    # sets label "env"). Defaults to "prod" so alerts without this label
+    # still correlate sensibly instead of erroring.
+    environment = alert.labels.get("env", "prod")
     window_start = alert.received_at - timedelta(seconds=config.CORRELATION_WINDOW_SECONDS)
 
-    existing = db.find_open_incident(root_service, window_start)
+    # Scoping by (service, environment) - not service alone - means a
+    # staging alert never merges into a prod incident just because the
+    # service name matches. This was a real gap: a service can run
+    # multiple environments/versions at once, and lumping them together
+    # under one incident hides which one is actually affected.
+    existing = db.find_open_incident(root_service, environment, window_start)
 
     if existing:
         existing.alertnames = list(set(existing.alertnames + [alert.alertname]))
@@ -49,6 +58,7 @@ def correlate(alert: Alert) -> Incident:
 
     incident = Incident(
         primary_service=root_service,
+        environment=environment,
         alertnames=[alert.alertname],
         alert_count=1,
         severity=alert.severity,
