@@ -5,9 +5,10 @@ learning loop.
 
 Run: uvicorn app.main:app --reload --port 8000
 """
-from fastapi import Depends
+from fastapi import Depends, Response
 from app.security import require_api_key
 from fastapi import FastAPI, HTTPException
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from app.models.schemas import FeedbackIn
 from app.ingestion.generic_webhook import parse_generic_payload
 from app.ingestion.prometheus_adapter import parse_alertmanager_payload
@@ -15,6 +16,7 @@ from app.core import correlator, enricher, scorer, remediation
 from app.notifier import dispatcher
 from app.storage import db
 from app.dashboard_router import router as dashboard_router
+from app import metrics
 
 app = FastAPI(title="Alert Intelligence Layer")
 app.include_router(dashboard_router)
@@ -27,9 +29,20 @@ def _startup():
 
 def _process(alert):
     """The full pipeline, run once per normalized alert."""
+    metrics.alerts_ingested_total.labels(source=alert.source).inc()
+
     incident = correlator.correlate(alert)
+    if incident.alert_count == 1:
+        # alert_count == 1 right after correlate() means this alert
+        # opened a brand new incident rather than merging into one -
+        # this counter vs. alerts_ingested_total IS the noise reduction
+        # this project exists to provide.
+        metrics.incidents_created_total.inc()
+
     incident = enricher.enrich(incident)
     scorer.score(incident)
+    metrics.confidence_score.observe(incident.confidence_score)
+
     incident = remediation.maybe_remediate(incident)
     db.update_incident(incident)
     dispatcher.notify(incident)
@@ -74,3 +87,11 @@ def submit_feedback(incident_id: int, feedback: FeedbackIn):
     db.resolve_incident(incident_id, status, feedback.resolved_by)
 
     return {"incident_id": incident_id, "status": status, "learning": "weights updated"}
+
+
+@app.get("/metrics")
+def get_metrics():
+    """No auth on this - Prometheus needs to scrape it directly, and it's
+    read-only metrics, not a way to push data in (same reasoning as
+    /dashboard and /api/incidents staying open)."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

@@ -9,9 +9,11 @@ Otherwise, it's surfaced as a *suggestion* only - never silently applied.
 """
 
 import yaml
-from app.models.schemas import Incident
+
 from app import config
+from app import metrics
 from app.core import k8s_executor
+from app.models.schemas import Incident
 
 _runbooks_cache = None
 
@@ -46,8 +48,16 @@ def maybe_remediate(incident: Incident) -> Incident:
         runbook.get("safe_to_automate", False)
         and incident.confidence_score >= config.MIN_CONFIDENCE_FOR_AUTOMATION
     )
+
     if can_automate:
         _execute(runbook.get("action"), incident.primary_service)
+
+        # Record every remediation action (real or dry-run)
+        metrics.remediation_actions_total.labels(
+            action=runbook.get("action"),
+            mode="dry_run" if config.KUBE_DRY_RUN else "auto",
+        ).inc()
+
         incident.auto_remediated = True
 
     return incident
@@ -57,7 +67,8 @@ def _execute(action: str, service: str) -> None:
     """Runs the real Kubernetes action via k8s_executor. Any failure here
     is caught and logged rather than raised - a remediation attempt going
     wrong must never crash the alert pipeline itself; the incident still
-    gets reported to on-call either way."""
+    gets reported to on-call either way.
+    """
     handler = k8s_executor.ACTIONS.get(action)
     if not handler:
         print(f"[REMEDIATION] No executor registered for action '{action}' - skipping")
@@ -66,4 +77,6 @@ def _execute(action: str, service: str) -> None:
     try:
         handler(service)
     except Exception as e:
-        print(f"[REMEDIATION FAILED] action='{action}' service='{service}' error={e}")
+        print(
+            f"[REMEDIATION FAILED] action='{action}' service='{service}' error={e}"
+        )
