@@ -17,6 +17,8 @@ load_dotenv(BASE_DIR / ".env")
 # sending to Slack - so the app still runs fine without Slack configured.
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
+API_KEY = os.getenv("API_KEY")
+
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     f"sqlite:///{BASE_DIR / 'alert_intelligence.db'}"

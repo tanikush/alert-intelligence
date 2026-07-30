@@ -5,7 +5,8 @@ learning loop.
 
 Run: uvicorn app.main:app --reload --port 8000
 """
-
+from fastapi import Depends
+from app.security import require_api_key
 from fastapi import FastAPI, HTTPException
 from app.models.schemas import FeedbackIn
 from app.ingestion.generic_webhook import parse_generic_payload
@@ -35,7 +36,7 @@ def _process(alert):
     return incident
 
 
-@app.post("/webhook/generic")
+@app.post("/webhook/generic", dependencies=[Depends(require_api_key)])
 def webhook_generic(payload: dict):
     alert = parse_generic_payload(payload)
     incident = _process(alert)
@@ -44,7 +45,7 @@ def webhook_generic(payload: dict):
             "auto_remediated": incident.auto_remediated}
 
 
-@app.post("/webhook/prometheus")
+@app.post("/webhook/prometheus", dependencies=[Depends(require_api_key)])
 def webhook_prometheus(payload: dict):
     alerts = parse_alertmanager_payload(payload)
     results = [_process(a) for a in alerts]
@@ -59,7 +60,7 @@ def get_incident(incident_id: int):
     return incident
 
 
-@app.post("/incidents/{incident_id}/feedback")
+@app.post("/incidents/{incident_id}/feedback", dependencies=[Depends(require_api_key)])
 def submit_feedback(incident_id: int, feedback: FeedbackIn):
     """This is the loop most alert tools never close: on-call tells the
     system whether it was right, and the scorer's learned weights update
