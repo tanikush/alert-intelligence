@@ -418,6 +418,29 @@ then opening `http://localhost:8080/dashboard`.
 
 ---
 
+## Environment and version-aware correlation
+
+Correlation and deploy-matching are scoped by **(service, environment)**,
+not service name alone. A `checkout-api` alert in `staging` will never
+merge into a `checkout-api` incident in `prod`, and deploy correlation
+only credits a deploy to an incident if it happened in the *same*
+environment - so the notification can say exactly which release is
+implicated, not just "something deployed recently".
+
+The environment comes from the alert's `env` label (defaults to `prod`
+if absent). This came directly from a LinkedIn comment on this project -
+a founder building alerting infra pointed out that real systems key
+deploy correlation off a `(service, env, version)` triple rather than
+service name alone; this is that idea applied here.
+
+```bash
+# These stay as two separate incidents instead of merging:
+curl -X POST http://localhost:8000/webhook/generic -d '{"service":"checkout-api","alertname":"HighErrorRate","labels":{"env":"prod"}, ...}'
+curl -X POST http://localhost:8000/webhook/generic -d '{"service":"checkout-api","alertname":"HighErrorRate","labels":{"env":"staging"}, ...}'
+```
+
+---
+
 ## Dynamic Kubernetes topology
 
 Service dependency mapping used to be a hardcoded Python dictionary. Now
