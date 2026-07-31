@@ -544,6 +544,31 @@ See `.env.example` for the full list of environment variables this app reads.
 
 ---
 
+## Self-observability (/metrics)
+
+This app is itself something worth monitoring - `GET /metrics` exposes
+standard Prometheus exposition format, so the same Prometheus instance
+watching your services can also watch this alerting layer.
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+Metrics exposed (see `app/metrics.py`):
+
+| Metric | What it shows |
+|---|---|
+| `alert_intelligence_alerts_ingested_total{source}` | Every raw alert received, by source |
+| `alert_intelligence_incidents_created_total` | Distinct incidents opened (not merges) - the gap between this and alerts ingested **is** the noise reduction this project provides |
+| `alert_intelligence_remediation_actions_total{action,mode}` | Every remediation action taken, tagged `dry_run` or `auto` |
+| `alert_intelligence_confidence_score` | Histogram of confidence scores across all incidents |
+
+No auth on this endpoint - Prometheus needs to scrape it directly, and
+it's read-only, not a way to push data in (same reasoning as the dashboard
+staying open).
+
+---
+
 ## GitOps deployment with ArgoCD
 
 Instead of manually running `kubectl apply` for every change, ArgoCD
