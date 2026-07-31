@@ -4,7 +4,7 @@ metadata:
   name: alert-intelligence
   namespace: monitoring
 spec:
-  replicas: 2   # was 1 - now 2 to prove multiple instances can safely
+  replicas: 3   # was 1 - now 2 to prove multiple instances can safely
                 # share the same Postgres database at once
   selector:
     matchLabels:
