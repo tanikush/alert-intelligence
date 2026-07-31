@@ -1,0 +1,30 @@
+# This tells ArgoCD: "watch this GitHub repo's k8s/ folder, and keep the
+# monitoring namespace in the cluster in sync with whatever is there."
+#
+# syncPolicy.automated means ArgoCD applies changes automatically when it
+# detects a diff between Git and the cluster - no manual `kubectl apply`
+# needed anymore, once this is set up.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alert-intelligence
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/tanikush/alert-intelligence.git
+    targetRevision: main
+    path: k8s
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true       # remove resources from the cluster if removed from Git
+      selfHeal: true     # revert manual kubectl changes back to match Git
+    syncOptions:
+      - CreateNamespace=true

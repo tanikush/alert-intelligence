@@ -153,7 +153,10 @@ alert-intelligence/
 │   └── service_k8s_map.yaml      # service name → namespace/deployment/labels
 ├── custom-prometheus-rules.yaml   # hand-written PrometheusRule, not from the default stack
 ├── rbac-topology-reader.yaml      # read-only RBAC for dynamic topology discovery
-├── postgres-deploy.yaml           # Postgres Deployment + Secret for the cluster
+├── k8s/                           # manifests managed via ArgoCD (GitOps)
+│   ├── k8s-deploy.yaml            # app Deployment + Service
+│   └── postgres-deploy.yaml       # Postgres Deployment + Secret
+├── argocd-application.yaml        # ArgoCD Application pointing at k8s/
 ├── tests/test_correlator.py      # correlation logic unit tests
 ├── requirements.txt
 ├── Dockerfile
@@ -538,6 +541,34 @@ app still runs out of the box for local development, but this should never
 be left unset anywhere beyond that.
 
 See `.env.example` for the full list of environment variables this app reads.
+
+---
+
+## GitOps deployment with ArgoCD
+
+Instead of manually running `kubectl apply` for every change, ArgoCD
+continuously watches this repo's `k8s/` folder and keeps the cluster in
+sync with whatever is committed to `main` - Git becomes the single source
+of truth for what should be running.
+
+`argocd-application.yaml` defines the ArgoCD `Application` resource:
+- **Source:** this repo, `k8s/` folder, `main` branch
+- **Destination:** the `monitoring` namespace
+- **Sync policy:** automated, with `selfHeal` (reverts manual `kubectl`
+  changes back to match Git) and `prune` (removes resources deleted from Git)
+
+**Setup:**
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -f argocd-application.yaml
+```
+
+**Verified end-to-end:** changed `replicas: 2` to `replicas: 3` in
+`k8s/k8s-deploy.yaml` directly on GitHub (no local `kubectl` command at
+all), and ArgoCD picked up the change and scaled the deployment on its own
+within its sync interval - confirmed via `kubectl get pods -n monitoring`
+showing a third replica appear with zero manual intervention.
 
 ---
 
