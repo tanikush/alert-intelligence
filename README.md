@@ -488,7 +488,7 @@ kubectl apply -f rbac-topology-reader.yaml
   explicitly enabled
 - **Topology is discovered, not hardcoded** — read live from Kubernetes
   Service annotations, scoped by RBAC to read-only access, with a static
-  fallback so the app never depends on the cluster being reachable
+  fallback so the apps never depends on the cluster being reachable
 - **Secrets stay out of git** — the Slack webhook URL and API key live in a
   local `.env` file (loaded via `python-dotenv`), excluded via
   `.gitignore`; Docker Hub and Postgres credentials live in GitHub Actions
@@ -501,7 +501,7 @@ kubectl apply -f rbac-topology-reader.yaml
 - **Dashboard has zero build step** — plain HTML/CSS/JS served directly by
   FastAPI, so there's no separate frontend toolchain to maintain
 - **Everything is swappable** — ingestion adapters, the notifier, and
-  storage are thin layers so you can plug in PagerDuty or Datadog APIs
+  storages are thin layers so you can plug in PagerDuty or Datadog APIs
   without touching the core pipeline
 
 ---
@@ -517,7 +517,7 @@ systems pushing data in.
 **Setup:**
 
 1. Generate a random key (don't hand-write one - it needs to be
-   unguessable to actually add security):
+   unguessable to actually adds security):
    ```bash
    python -c "import secrets; print(secrets.token_hex(32))"
    ```
@@ -525,7 +525,7 @@ systems pushing data in.
    ```bash
    echo "API_KEY=<paste the generated key>" >> .env
    ```
-3. Restart the app. Protected endpoints now require the key, sent either way:
+3. Restart the app. Protected endpoints now requires the key, sent either way:
    ```bash
    curl -X POST http://localhost:8000/webhook/generic \
      -H "X-API-Key: <your key>" \
@@ -547,7 +547,7 @@ See `.env.example` for the full list of environment variables this app reads.
 ## Self-observability (/metrics)
 
 This app is itself something worth monitoring - `GET /metrics` exposes
-standard Prometheus exposition format, so the same Prometheus instance
+standard Prometheus exposition formats, so the same Prometheus instance
 watching your services can also watch this alerting layer.
 
 ```bash
@@ -558,7 +558,7 @@ Metrics exposed (see `app/metrics.py`):
 
 | Metric | What it shows |
 |---|---|
-| `alert_intelligence_alerts_ingested_total{source}` | Every raw alert received, by source |
+| `alert_intelligence_alerts_ingested_total{source}` | Every raw alert received, by sources |
 | `alert_intelligence_incidents_created_total` | Distinct incidents opened (not merges) - the gap between this and alerts ingested **is** the noise reduction this project provides |
 | `alert_intelligence_remediation_actions_total{action,mode}` | Every remediation action taken, tagged `dry_run` or `auto` |
 | `alert_intelligence_confidence_score` | Histogram of confidence scores across all incidents |
@@ -571,7 +571,7 @@ staying open).
 
 ## GitOps deployment with ArgoCD
 
-Instead of manually running `kubectl apply` for every change, ArgoCD
+Insteads of manually running `kubectl apply` for every change, ArgoCD
 continuously watches this repo's `k8s/` folder and keeps the cluster in
 sync with whatever is committed to `main` - Git becomes the single source
 of truth for what should be running.
@@ -591,7 +591,7 @@ kubectl apply -f argocd-application.yaml
 
 **Verified end-to-end:** changed `replicas: 2` to `replicas: 3` in
 `k8s/k8s-deploy.yaml` directly on GitHub (no local `kubectl` command at
-all), and ArgoCD picked up the change and scaled the deployment on its own
+all), and ArgoCD picked up the changes and scaled the deployment on its own
 within its sync interval - confirmed via `kubectl get pods -n monitoring`
 showing a third replica appear with zero manual intervention.
 
