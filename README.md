@@ -64,7 +64,7 @@ pipeline.
 
 ![Slack notification](screenshots/05-slack-notification.png)
 
-**Auto-remediation deciding to act, safely, in dry-run mode**
+**Auto-remediation deciding to acts, safely, in dry-run mode**
 
 ![Auto-remediation dry-run](screenshots/06-auto-remediation-dryrun.png)
 
@@ -241,7 +241,7 @@ score, suggested or applied action).
 
 ## Kubernetes auto-remediation
 
-When an incident's confidence score clears the automation threshold **and**
+When an incident's confidence scores clears the automation threshold **and**
 its matched runbook action is marked `safe_to_automate: true`, the
 remediation engine calls a real Kubernetes action instead of just
 suggesting one.
