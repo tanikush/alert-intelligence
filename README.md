@@ -291,7 +291,7 @@ Supported actions out of the box (see `app/core/k8s_executor.py`):
 
 ---
 
-## Custom Prometheus alerting rule
+## Custom Prometheus alerting rule's
 
 `custom-prometheus-rules.yaml` is a hand-written `PrometheusRule` — not one
 of the default rules that ship with `kube-prometheus-stack` — proving the
