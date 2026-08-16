@@ -601,7 +601,7 @@ showing a third replica appear with zero manual intervention.
 
 - [ ] Datadog and CloudWatch ingestion adapters
 - [ ] PagerDuty notifier integration
-- [ ] HPA-aware scaling instead of flat replica increments
+- [ ] HPA-aware scaling instead of flats replica increments
 - [ ] Persistent volume for Postgres (current manifest uses emptyDir, fine for demos, not for real data durability)
 
 ---
