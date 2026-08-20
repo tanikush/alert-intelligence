@@ -78,7 +78,7 @@ pipeline.
 
 ---
 
-## Architecture
+## Architecture:-
 
 ```
 Alert Sources (Prometheus Alertmanager / Datadog / generic webhook)
@@ -125,7 +125,7 @@ Alert Sources (Prometheus Alertmanager / Datadog / generic webhook)
 
 ---
 
-## Project structure
+## Project structure:-
 
 ```
 alert-intelligence/
@@ -166,7 +166,7 @@ alert-intelligence/
 
 ---
 
-## Quickstart (local)
+## Quickstart (local):-
 
 ```bash
 git clone https://github.com/<your-username>/alert-intelligence.git
@@ -204,7 +204,7 @@ curl -X POST http://localhost:8000/incidents/1/feedback \
 
 ---
 
-## Live dashboard
+## Live dashboard:-
 
 `GET /dashboard` serves a small, dependency-free HTML page that polls
 `GET /api/incidents` every 4 seconds and renders every incident with a
@@ -217,7 +217,7 @@ alerts) show up within seconds without needing to read raw JSON or logs.
 
 ---
 
-## Slack notifications
+## Slack notifications:-
 
 Incidents are sent to Slack via an Incoming Webhook. If no webhook is
 configured, the app falls back to printing the same message to console —
@@ -239,7 +239,7 @@ score, suggested or applied action).
 
 ---
 
-## Kubernetes auto-remediation
+## Kubernetes auto-remediation:-
 
 When an incident's confidence scores clears the automation threshold **and**
 its matched runbook action is marked `safe_to_automate: true`, the
