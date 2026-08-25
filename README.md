@@ -23,7 +23,7 @@ API, and a real Postgres database shared across 2 app replicas.
 
 ---
 
-## The Problem
+## The Problem:-
 
 On-call engineers get paged 10-50 times for a single outage. One root cause
 (say, a pod crash) cascades into alerts across every dependent service.
@@ -38,7 +38,7 @@ This project is a minimal, extensible core for that missing layer.
 
 ---
 
-## Proof it works
+## Proof it works:-
 
 Tested end-to-end — not just written, actually run against a real Kubernetes
 cluster, real Prometheus alerts, a real Slack workspace, and a real CI/CD
@@ -291,7 +291,7 @@ Supported actions out of the box (see `app/core/k8s_executor.py`):
 
 ---
 
-## Custom Prometheus alerting rule's
+## Custom Prometheus alerting rule's:-
 
 `custom-prometheus-rules.yaml` is a hand-written `PrometheusRule` — not one
 of the default rules that ship with `kube-prometheus-stack` — proving the
@@ -316,7 +316,7 @@ name so the Prometheus Operator auto-discovers it.
 
 ---
 
-## CI/CD pipeline
+## CI/CD pipeline:-
 
 `.github/workflows/ci.yml` runs on every push and pull request to `main`:
 
@@ -338,7 +338,7 @@ docker run -p 8000:8000 <your-dockerhub-username>/alert-intelligence:latest
 
 ---
 
-## Postgres and multi-instance deployments
+## Postgres and multi-instance deployments:-
 
 By default this runs on SQLite (`DATABASE_URL` unset) - zero setup, great
 for local development. But SQLite is a single file: two app instances
