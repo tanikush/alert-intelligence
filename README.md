@@ -593,7 +593,7 @@ kubectl apply -f argocd-application.yaml
 `k8s/k8s-deploy.yaml` directly on GitHub (no local `kubectl` command at
 all), and ArgoCD picked up the changes and scaled the deployment on its own
 within its sync interval - confirmed via `kubectl get pods -n monitoring`
-showing a third replica appear with zero manual intervention.
+showing a third replica appears with zero manual intervention.
 
 ---
 
