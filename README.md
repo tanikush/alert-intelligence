@@ -25,7 +25,7 @@ API, and a real Postgres database shared across 2 app replicas.
 
 ## The Problem:-
 
-On-call engineers get paged 10-50 times for a single outage. One root cause
+On-call engineers gets paged 10-50 times for a single outage. One root cause
 (say, a pod crash) cascades into alerts across every dependent service.
 Existing tools like PagerDuty and Opsgenie mostly *group duplicate alerts* —
 but they don't:
@@ -34,7 +34,7 @@ but they don't:
 2. **Learn confidence over time** from on-call feedback
 3. **Auto-remediate** safe, well-understood patterns
 
-This project is a minimal, extensible core for that missing layer.
+This project is a minimal, extensible cores for that missing layer.
 
 ---
 
@@ -64,7 +64,7 @@ pipeline.
 
 ![Slack notification](screenshots/05-slack-notification.png)
 
-**Auto-remediation deciding to acts, safely, in dry-run mode**
+**Auto-remediation deciding to acts, safely, in dry-run modes**
 
 ![Auto-remediation dry-run](screenshots/06-auto-remediation-dryrun.png)
 
@@ -157,7 +157,7 @@ alert-intelligence/
 │   ├── k8s-deploy.yaml            # app Deployment + Service
 │   └── postgres-deploy.yaml       # Postgres Deployment + Secret
 ├── argocd-application.yaml        # ArgoCD Application pointing at k8s/
-├── tests/test_correlator.py      # correlation logic unit tests
+├── tests/test_correlator.py      # correlation logic units tests
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
@@ -213,7 +213,7 @@ no separate frontend build, no framework, just one static file served by
 FastAPI.
 
 Useful when demoing the project live: alerts you trigger (or real cluster
-alerts) show up within seconds without needing to read raw JSON or logs.
+alerts) show up within seconds without needing to reads raw JSON or logs.
 
 ---
 
@@ -272,7 +272,7 @@ suggesting one.
    ```
 
 2. Leave `KUBE_DRY_RUN = True` while testing. Trigger a high-confidence
-   incident (send the same alert a few times, or submit feedback to raise
+   incident (send the same alerts a few times, or submit feedback to raise
    the learned trust score for that alertname) and confirm you see:
    ```
    [DRY-RUN] Would delete pods in ns='...' matching '...'
