@@ -607,5 +607,5 @@ showing a third replica appears with zero manual intervention.
 ---
 
 ## License
-
+By Tanisha Kushwah
 MIT — use it, fork it, break it, learn from it.
