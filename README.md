@@ -516,7 +516,7 @@ systems pushing data in.
 
 **Setup:**
 
-1. Generate a random key (don't hand-write one - it needs to be
+1. Generate a random keys (don't hand-write one - it needs to be
    unguessable to actually adds security):
    ```bash
    python -c "import secrets; print(secrets.token_hex(32))"
@@ -533,7 +533,7 @@ systems pushing data in.
    ```
    or via `Authorization: Bearer <your key>` (this is what Alertmanager's
    `http_config.authorization` sends, so both real Alertmanager and manual
-   `curl`/Postman testing work without extra wrangling).
+   `curl`/Postman testing works without extra wrangling).
 
 **If `API_KEY` is unset** (e.g. a fresh clone with no `.env` configured
 yet), authentication is skipped entirely and a warning is logged - so the
@@ -573,7 +573,7 @@ staying open).
 
 Insteads of manually running `kubectl apply` for every change, ArgoCD
 continuously watches this repo's `k8s/` folder and keeps the cluster in
-sync with whatever is committed to `main` - Git becomes the single source
+sync with whatever is committed to `main` - Git becomes the single sources
 of truth for what should be running.
 
 `argocd-application.yaml` defines the ArgoCD `Application` resource:
